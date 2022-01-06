@@ -1,8 +1,9 @@
 #!/usr/bin/env python
-import pygame
+import pygame, sys
 from pygame.locals import *
 from collections import defaultdict
 from sys import maxsize
+from getopt import GetoptError, getopt
 
 WHITE = (255, 255, 255)
 GRAY = (125, 125, 125)
@@ -20,6 +21,10 @@ start_cell, end_cell = None, None
 start_xy, end_xy = None, None
 grid_size = 60
 edited_squares = []
+
+
+def print_usage():
+    pass
 
 
 def dijkstra(screen, grid, start, end, squares):
@@ -130,29 +135,27 @@ def setup_grid(grid_size, size, screen):
 
 
 def setup_buttons(screen):
-    buttons = [pygame.Rect(5, 605, 30, 15),
-               pygame.Rect(40, 605, 30, 15),
-               pygame.Rect(75, 605, 30, 15),
-               pygame.Rect(110, 605, 30, 15),
-               pygame.Rect(145, 605, 45, 15),
-               pygame.Rect(535, 605, 60, 15)]
+    start_label = pygame.font.SysFont("Ubuntu", 11).render("Set Start", 1, WHITE)
+    end_label = pygame.font.SysFont("Ubuntu", 11).render("Set End", 1, WHITE)
+    obs_label = pygame.font.SysFont("Ubuntu", 11).render("Set Obs.", 1, WHITE)
+    clear_label = pygame.font.SysFont("Ubuntu", 11).render("Clear (1)", 1, WHITE)
+    clean_label = pygame.font.SysFont("Ubuntu", 11).render("Clean", 1, WHITE)
+    reset_label = pygame.font.SysFont("Ubuntu", 11).render("Reset", 1, WHITE)
+    findpath_label = pygame.font.SysFont("Ubuntu", 11).render("Find Path", 1, WHITE)
+
+    labels = [start_label, end_label, obs_label, clear_label, clean_label, reset_label, findpath_label]
+    buttons = []
+    margin = 3
+    next = (2, 605)
+
+    for l in labels:
+        w, h = l.get_size()
+        bg_button = pygame.Rect(next[0], next[1], w+8, h+4)
+        pygame.draw.rect(screen, WHITE, bg_button, 1)
+        buttons.append(bg_button)
+        screen.blit(l, (next[0]+4, next[1]+2))
+        next = (next[0]+w+8+margin, next[1])
     
-    for b in buttons:
-        pygame.draw.rect(screen, WHITE, b)
-
-    start_label = pygame.font.SysFont("Ubuntu", 11).render("Start", 1, BLACK)
-    end_label = pygame.font.SysFont("Ubuntu", 11).render("End", 1, BLACK)
-    obs_label = pygame.font.SysFont("Ubuntu", 11).render("Obs.", 1, BLACK)
-    clear_label = pygame.font.SysFont("Ubuntu", 11).render("Clear", 1, BLACK)
-    clear_all_label = pygame.font.SysFont("Ubuntu", 11).render("Clear all", 1, BLACK)
-    begin_label = pygame.font.SysFont("Ubuntu", 11).render("Begin algo", 1, BLACK)
-    screen.blit(start_label, (8, 607))
-    screen.blit(end_label, (45, 607))
-    screen.blit(obs_label, (78, 607))
-    screen.blit(clear_label, (112, 607))
-    screen.blit(clear_all_label, (147, 607))
-    screen.blit(begin_label, (540, 607))
-
     return buttons
 
 
@@ -203,13 +206,13 @@ def reset_grid(screen, squares, grid_size):
     return [[1 for i in range(grid_size)] for ii in range(grid_size)]
 
 
-def main():
+def main(algo):
     global edit_mode, grid_size, edited_squares
     global start_cell, end_cell, start_xy, end_xy
 
     pygame.init()
     size = 600
-    screen = pygame.display.set_mode([size, size+25])
+    screen = pygame.display.set_mode([size+2, size+25])
     pygame.display.set_caption("visual-pathfinder")
     clock = pygame.time.Clock()
     
@@ -233,39 +236,40 @@ def main():
                 done = 1
 
             elif e.type == pygame.MOUSEBUTTONDOWN:
-                # clean the grid
-                if edited_squares:
-                    for s in edited_squares:
-                        pygame.draw.rect(screen, WHITE, s)
-                    edited_squares = []
-
-                # choose mode / start algo
                 for i, b in enumerate(buttons):
                     if b.collidepoint(mouse):
-                        if i == 4:
-                            grid = reset_grid(screen, squares, grid_size)
-                            start_cell, start_xy = None, None
-                            end_cell, end_xy = None, None
+                        match i:
+                            case 4:
+                                # clean
+                                if edited_squares:
+                                    for s in edited_squares:
+                                        pygame.draw.rect(screen, WHITE, s)
+                                    edited_squares = []
+                            case 5:
+                                # reset
+                                grid = reset_grid(screen, squares, grid_size)
+                                start_cell, start_xy = None, None
+                                end_cell, end_xy = None, None
+                            case 6:
+                                # algo
+                                if start_cell and end_cell:
+                                    match algo:
+                                        case 0:
+                                            dijkstra(screen, grid, start_xy, end_xy, squares)
+                                        case 1:
+                                            a_star(screen, grid, start_xy, end_xy, squares)
+                                else:
+                                    print("ERROR: start/end missing")
 
                         print(f"edit_mode = {str(i)}")
                         edit_mode = i
 
-                        if i == 5: 
-                            if start_cell and end_cell:
-                                dijkstra(screen, grid, start_xy, end_xy, squares)
-                            else:
-                                print("ERROR: start/end missing")
-                
-                if 140 < mouse[0] < 535 and 605 < mouse[1] < 620:
-                    print(f"edit_mode = -1")
-                    edit_mode = -1
-
-                # choose cell
+                # choose cell to edit
                 for i, r in enumerate(squares):
                     for j, s in enumerate(r):
                         if s.collidepoint(mouse):
                             print(f"collides [{str(edit_mode)}]")
-                            if edit_mode not in [-1, 4]:
+                            if edit_mode not in [-1, 4, 5, 6]:
                                 grid = mark_cell(screen, s, grid, (i, j), edit_mode)
 
         pygame.display.update()
@@ -273,5 +277,20 @@ def main():
 
 
 if __name__ == "__main__":
-    # TODO add cli flags with getopts (for choosing algo)
-    main()
+    try:
+        opts, args = getopt(sys.argv[1:], "ha:", ["algo="])
+    except GetoptError:
+        print_usage()
+        sys.exit(2)
+
+    # default to dijkstra
+    algo = 0
+
+    for opt, arg in opts:
+        if opt == "-h":
+            print_usage()
+            sys.exit()
+        elif opt in ("-a", "--algo"):
+            algo = arg
+
+    main(algo)
