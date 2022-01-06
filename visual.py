@@ -164,7 +164,7 @@ def mark_cell(screen, rect, grid, xy, mode):
 
     match mode:
         case 0:
-            # set start (update grid)
+            # start
             if start_cell:
                 pygame.draw.rect(screen, WHITE, start_cell)
                 pygame.draw.rect(screen, modes[mode], rect)
@@ -173,7 +173,7 @@ def mark_cell(screen, rect, grid, xy, mode):
             start_cell = rect
             start_xy = xy
         case 1:
-            # set end (update grid)
+            # end
             if end_cell:
                 pygame.draw.rect(screen, WHITE, end_cell)
                 pygame.draw.rect(screen, modes[mode], rect)
@@ -181,12 +181,8 @@ def mark_cell(screen, rect, grid, xy, mode):
                 pygame.draw.rect(screen, modes[mode], rect)
             end_cell = rect
             end_xy = xy
-        case 2:
-            # set obstacle (update grid)
-            pygame.draw.rect(screen, BLACK, rect)
-            grid[xy[0]][xy[1]] = maxsize
         case 3:
-            # clear cell
+            # clear
             pygame.draw.rect(screen, WHITE, rect)
             if rect == end_cell:
                 end_cell, end_xy = None, None
@@ -194,6 +190,19 @@ def mark_cell(screen, rect, grid, xy, mode):
                 start_cell, start_xy = None, None
             elif grid[xy[0]][xy[1]] == maxsize:
                 grid[xy[0]][xy[1]] = 1
+
+    return grid
+
+
+def paint_obstacle(screen, grid, squares):
+    mouse = pygame.mouse.get_pos()
+    click = pygame.mouse.get_pressed()
+    if click[0] == True:
+        for y, r in enumerate(squares):
+            for x, s in enumerate(r):
+                if s.collidepoint(mouse):
+                    pygame.draw.rect(screen, BLACK, s)
+                    grid[y][x] = maxsize
 
     return grid
 
@@ -224,6 +233,9 @@ def main(algo):
     done = 0
     while not done:
         mouse = pygame.mouse.get_pos()
+
+        if edit_mode == 2:
+            grid = paint_obstacle(screen, grid, squares)
         
         for b in buttons:
             if b.collidepoint(mouse):
@@ -271,7 +283,7 @@ def main(algo):
                             print(f"collides [{str(edit_mode)}]")
                             if edit_mode not in [-1, 4, 5, 6]:
                                 grid = mark_cell(screen, s, grid, (i, j), edit_mode)
-
+            
         pygame.display.update()
         clock.tick(60)
 
