@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import pygame, sys
+from math import sqrt
 from pygame.locals import *
 from collections import defaultdict
 from sys import maxsize
@@ -31,15 +32,15 @@ def dijkstra(screen, grid, start, end, squares):
     global edited_squares
     
     gh, gw = len(grid), len(grid[0])
-    heap_que = defaultdict(tuple)
-    heap_que[start] = 0
+    que = defaultdict(tuple)
+    que[start] = 0
     visited = set()
     minimums = defaultdict(lambda: maxsize)
 
-    while heap_que:
-        distance = min(heap_que.values())
-        cur = list(heap_que.keys())[list(heap_que.values()).index(distance)]
-        heap_que.pop(cur)
+    while que:
+        distance = min(que.values())
+        cur = list(que.keys())[list(que.values()).index(distance)]
+        que.pop(cur)
 
         if cur == end:
             print(f"distance: {str(distance)}")
@@ -63,10 +64,10 @@ def dijkstra(screen, grid, start, end, squares):
                 continue
             elif n[1] < 0 or n[1] > gh-1:
                 continue
-            elif n in visited:
+            elif n in visited or grid[n[0]][n[1]] == maxsize:
                 continue
 
-            if n != end and grid[n[0]][n[1]] == 1:
+            if n != end:
                 pygame.draw.rect(screen, GREEN, squares[n[0]][n[1]])
                 edited_squares.append(squares[n[0]][n[1]])
 
@@ -74,12 +75,16 @@ def dijkstra(screen, grid, start, end, squares):
             n_distance = distance + n_weigh
             if n_distance < minimums[n]:
                 minimums[n] = n_distance
-                heap_que[n] = n_distance
+                que[n] = n_distance
 
             # update grid visuals
             pygame.display.update()
 
     # backtrack & visualize the path
+    backtrack(screen, start, end, squares, gw, gh, minimums)
+
+
+def backtrack(screen, start, end, squares, gw, gh, minimums):
     cur = end
     visited = []
     lowest = maxsize
@@ -116,15 +121,70 @@ def dijkstra(screen, grid, start, end, squares):
         cur = next
 
 
-def a_star(grid, start, end):
-    # TODO add a*
-    visited = set()
-    open_nodes = set()
-    open_nodes.add(start)
-    minimums = defaultdict(maxsize)
+def a_star(screen, grid, start, end, squares):
+    global edited_squares
+    
+    gh, gw = len(grid), len(grid[0])
+    que = defaultdict(tuple)
+    que[start] = (0, 0, 0)  # (g, h, f)
+    closed = set()
+    parents = defaultdict(tuple)
 
-    while len(open_nodes) > 0:
-        pass
+    while que:
+        distance = maxsize
+        cur_values = None
+        for q in que.values():
+            if q[2] < distance:
+                distance = q[2]
+                cur = list(que.keys())[list(que.values()).index(q)]
+                cur_values = q
+
+        que.pop(cur)
+
+        if cur == end:
+            print(f"distance: {str(distance)}")
+            break
+        elif cur in closed:
+            continue
+        else:
+            closed.add(cur)
+            if cur != start:
+                pygame.draw.rect(screen, DARK_GREEN, squares[cur[0]][cur[1]])
+                edited_squares.append(squares[cur[0]][cur[1]])
+
+        # calculate weights for neighbours
+        t, b = (cur[0]-1, cur[1]), (cur[0]+1, cur[1])
+        l, r = (cur[0], cur[1]-1), (cur[0], cur[1]+1)
+        tl, tr = (cur[0]-1, cur[1]-1), (cur[0]-1, cur[1]+1)
+        bl, br = (cur[0]+1, cur[1]-1), (cur[0]+1, cur[1]+1)
+
+        for n in [t, b, l, r, tl, tr, bl, br]:
+            if n[0] < 0 or n[0] > gw-1:
+                continue
+            elif n[1] < 0 or n[1] > gh-1:
+                continue
+            elif n in closed or grid[n[0]][n[1]] == maxsize:
+                continue
+
+            if n != end:
+                pygame.draw.rect(screen, GREEN, squares[n[0]][n[1]])
+                edited_squares.append(squares[n[0]][n[1]])
+
+            gcost = cur_values[0]+1
+            #hcost = round(sqrt((end[0]-n[0])**2 + (end[1]-n[1])**2))
+            hcost = (end[0]-n[0])**2 + (end[1]-n[1])**2
+            fcost = gcost + hcost
+            que[n] = (gcost, hcost, fcost)
+            parents[n] = cur
+
+            # update grid visuals
+            pygame.display.update()
+
+    # backtrack & visualize through parent nodes
+    cur = parents[end]
+    while cur != start:
+        pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
+        cur = parents[cur]
 
 
 def setup_grid(grid_size, size, screen):
@@ -305,8 +365,8 @@ if __name__ == "__main__":
         print_usage()
         sys.exit(2)
 
-    # default to dijkstra
-    algo = 0
+    # default
+    algo = 1
 
     for opt, arg in opts:
         if opt == "-h":
