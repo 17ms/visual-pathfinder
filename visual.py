@@ -55,8 +55,10 @@ def dijkstra(screen, grid, start, end, squares):
         # calculate weights for neighbours
         t, b = (cur[0]-1, cur[1]), (cur[0]+1, cur[1])
         l, r = (cur[0], cur[1]-1), (cur[0], cur[1]+1)
+        tl, tr = (cur[0]-1, cur[1]-1), (cur[0]-1, cur[1]+1)
+        bl, br = (cur[0]+1, cur[1]-1), (cur[0]+1, cur[1]+1)
         
-        for n in [t, b, l, r]:
+        for n in [t, b, l, r, tl, tr, bl, br]:
             if n[0] < 0 or n[0] > gw-1:
                 continue
             elif n[1] < 0 or n[1] > gh-1:
@@ -86,8 +88,10 @@ def dijkstra(screen, grid, start, end, squares):
     while True:
         t, b = (cur[0]-1, cur[1]), (cur[0]+1, cur[1])
         l, r = (cur[0], cur[1]-1), (cur[0], cur[1]+1)
+        tl, tr = (cur[0]-1, cur[1]-1), (cur[0]-1, cur[1]+1)
+        bl, br = (cur[0]+1, cur[1]-1), (cur[0]+1, cur[1]+1)
 
-        for n in [t, b, l, r]:
+        for n in [t, b, l, r, tl, tr, bl, br]:
             if gw-1 < n[0] < 0 or gh-1 < n[1] < 0:
                 continue
             elif n in visited:
@@ -114,11 +118,17 @@ def dijkstra(screen, grid, start, end, squares):
 
 def a_star(grid, start, end):
     # TODO add a*
-    pass
+    visited = set()
+    open_nodes = set()
+    open_nodes.add(start)
+    minimums = defaultdict(maxsize)
+
+    while len(open_nodes) > 0:
+        pass
 
 
 def setup_grid(grid_size, size, screen):
-    margin = 2
+    margin = 1
     margin_removed = size - (grid_size + 1) * margin
     node_size = round(margin_removed / grid_size)
     squares = []
@@ -221,7 +231,7 @@ def main(algo):
 
     pygame.init()
     size = 600
-    screen = pygame.display.set_mode([size+2, size+25])
+    screen = pygame.display.set_mode([size+1, size+25])
     pygame.display.set_caption("visual-pathfinder")
     clock = pygame.time.Clock()
     
