@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import pygame, sys
+import pygame, sys, random
 from math import sqrt
 from pygame.locals import *
 from collections import defaultdict
@@ -17,6 +17,8 @@ BLUE = (52, 79, 235)
 PURPLE = (103, 14, 227)
 
 modes = {0: BLUE, 1: PURPLE, 2: BLACK, 3: WHITE}
+algo = 0
+algo_names = ["Dijkstra", "A*"]
 edit_mode = -1
 start_cell, end_cell = None, None
 start_xy, end_xy = None, None
@@ -208,12 +210,14 @@ def setup_buttons(screen):
     start_label = pygame.font.SysFont("Ubuntu", 11).render("Set Start", 1, WHITE)
     end_label = pygame.font.SysFont("Ubuntu", 11).render("Set End", 1, WHITE)
     obs_label = pygame.font.SysFont("Ubuntu", 11).render("Set Obs.", 1, WHITE)
+    random_label = pygame.font.SysFont("Ubuntu", 11).render("Randomize", 1, WHITE)
     clear_label = pygame.font.SysFont("Ubuntu", 11).render("Clear (1)", 1, WHITE)
     clean_label = pygame.font.SysFont("Ubuntu", 11).render("Clean", 1, WHITE)
     reset_label = pygame.font.SysFont("Ubuntu", 11).render("Reset", 1, WHITE)
+    switch_label = pygame.font.SysFont("Ubuntu", 11).render("Switch", 1, WHITE)
     findpath_label = pygame.font.SysFont("Ubuntu", 11).render("Find Path", 1, WHITE)
 
-    labels = [start_label, end_label, obs_label, clear_label, clean_label, reset_label, findpath_label]
+    labels = [start_label, end_label, obs_label, random_label, clear_label, clean_label, reset_label, switch_label, findpath_label]
     buttons = []
     margin = 3
     next = (2, 605)
@@ -225,41 +229,42 @@ def setup_buttons(screen):
         buttons.append(bg_button)
         screen.blit(l, (next[0]+4, next[1]+2))
         next = (next[0]+w+8+margin, next[1])
+
+    last_pos = (next[0]+8, next[1]+1)
     
-    return buttons
+    return buttons, last_pos
 
 
 def mark_cell(screen, rect, grid, xy, mode):
     global modes, start_cell, end_cell, start_xy, end_xy
 
-    match mode:
-        case 0:
-            # start
-            if start_cell:
-                pygame.draw.rect(screen, WHITE, start_cell)
-                pygame.draw.rect(screen, modes[mode], rect)
-            else:
-                pygame.draw.rect(screen, modes[mode], rect)
-            start_cell = rect
-            start_xy = xy
-        case 1:
-            # end
-            if end_cell:
-                pygame.draw.rect(screen, WHITE, end_cell)
-                pygame.draw.rect(screen, modes[mode], rect)
-            else:
-                pygame.draw.rect(screen, modes[mode], rect)
-            end_cell = rect
-            end_xy = xy
-        case 3:
-            # clear
-            pygame.draw.rect(screen, WHITE, rect)
-            if rect == end_cell:
-                end_cell, end_xy = None, None
-            elif rect == start_cell:
-                start_cell, start_xy = None, None
-            elif grid[xy[0]][xy[1]] == maxsize:
-                grid[xy[0]][xy[1]] = 1
+    if mode == 0:
+        # start
+        if start_cell:
+            pygame.draw.rect(screen, WHITE, start_cell)
+            pygame.draw.rect(screen, modes[mode], rect)
+        else:
+            pygame.draw.rect(screen, modes[mode], rect)
+        start_cell = rect
+        start_xy = xy
+    elif mode == 1:
+        # end
+        if end_cell:
+            pygame.draw.rect(screen, WHITE, end_cell)
+            pygame.draw.rect(screen, modes[mode], rect)
+        else:
+            pygame.draw.rect(screen, modes[mode], rect)
+        end_cell = rect
+        end_xy = xy
+    elif mode == 4:
+        # clear
+        pygame.draw.rect(screen, WHITE, rect)
+        if rect == end_cell:
+            end_cell, end_xy = None, None
+        elif rect == start_cell:
+            start_cell, start_xy = None, None
+        elif grid[xy[0]][xy[1]] == maxsize:
+            grid[xy[0]][xy[1]] = 1
 
     return grid
 
@@ -277,6 +282,16 @@ def paint_obstacle(screen, grid, squares):
     return grid
 
 
+def random_obstacles(screen, grid, squares):
+    for y, r in enumerate(squares):
+        for x, s in enumerate(r):
+            if random.getrandbits(1):
+                pygame.draw.rect(screen, BLACK, s)
+                grid[y][x] = maxsize
+
+    return grid
+
+
 def reset_grid(screen, squares, grid_size):
     for r in squares:
         for s in r:
@@ -285,8 +300,21 @@ def reset_grid(screen, squares, grid_size):
     return [[1 for i in range(grid_size)] for ii in range(grid_size)]
 
 
-def main(algo):
-    global edit_mode, grid_size, edited_squares
+def algo_label_update(screen, pos, old):
+    global algo, algo_names
+    # write over old
+    if old:
+        screen.fill((0, 0, 0), (pos[0], pos[1], 50, 30))
+
+    old = algo_names[algo]
+    label = pygame.font.SysFont("Ubuntu", 13).render(old, 1, WHITE)
+    screen.blit(label, pos)
+    
+    return old
+
+
+def main():
+    global edit_mode, grid_size, edited_squares, algo
     global start_cell, end_cell, start_xy, end_xy
 
     pygame.init()
@@ -298,8 +326,13 @@ def main(algo):
     # visual elements
     screen.fill((0, 0, 0))
     grid, squares = setup_grid(grid_size, size, screen)
-    buttons = setup_buttons(screen)
-       
+    buttons, last_pos = setup_buttons(screen)
+    algo_label1 = pygame.font.SysFont("Ubuntu", 13).render("Algorithm: ", 1, WHITE)
+    label_w, label_h = algo_label1.get_size()
+    screen.blit(algo_label1, (last_pos[0], last_pos[1]))
+    last_pos = (last_pos[0]+label_w+4, last_pos[1])
+    current_algo_name = None
+
     done = 0
     while not done:
         mouse = pygame.mouse.get_pos()
@@ -320,28 +353,42 @@ def main(algo):
             elif e.type == pygame.MOUSEBUTTONDOWN:
                 for i, b in enumerate(buttons):
                     if b.collidepoint(mouse):
-                        match i:
-                            case 4:
-                                # clean
-                                if edited_squares:
-                                    for s in edited_squares:
-                                        pygame.draw.rect(screen, WHITE, s)
-                                    edited_squares = []
-                            case 5:
-                                # reset
-                                grid = reset_grid(screen, squares, grid_size)
-                                start_cell, start_xy = None, None
-                                end_cell, end_xy = None, None
-                            case 6:
-                                # algo
-                                if start_cell and end_cell:
-                                    match algo:
-                                        case 0:
-                                            dijkstra(screen, grid, start_xy, end_xy, squares)
-                                        case 1:
-                                            a_star(screen, grid, start_xy, end_xy, squares)
-                                else:
-                                    print("ERROR: start/end missing")
+                        if i == 3:
+                            # randomize (+ clean & reset)
+                            if edited_squares:
+                                for s in edited_squares:
+                                    pygame.draw.rect(screen, WHITE, s)
+                            grid = reset_grid(screen, squares, grid_size)
+                            start_cell, start_xy = None, None
+                            end_cell, end_xy = None, None
+                            grid = random_obstacles(screen, grid, squares)
+                        elif i == 5:
+                            # clean
+                            if edited_squares:
+                                for s in edited_squares:
+                                    pygame.draw.rect(screen, WHITE, s)
+                                edited_squares = []
+                        elif i == 6:
+                            # reset
+                            grid = reset_grid(screen, squares, grid_size)
+                            start_cell, start_xy = None, None
+                            end_cell, end_xy = None, None
+                        elif i == 7:
+                            # TODO update algo-variable
+                            if algo == len(algo_names)-1:
+                                algo = 0
+                            else:
+                                algo += 1
+                            current_algo_name = algo_label_update(screen, last_pos, current_algo_name)
+                        elif i == 8:
+                            # algo
+                            if start_cell and end_cell:
+                                if algo == 0:
+                                    dijkstra(screen, grid, start_xy, end_xy, squares)
+                                elif algo == 1:
+                                    a_star(screen, grid, start_xy, end_xy, squares)
+                            else:
+                                print("ERROR: start/end missing")
 
                         print(f"edit_mode = {str(i)}")
                         edit_mode = i
@@ -351,7 +398,7 @@ def main(algo):
                     for j, s in enumerate(r):
                         if s.collidepoint(mouse):
                             print(f"collides [{str(edit_mode)}]")
-                            if edit_mode not in [-1, 4, 5, 6]:
+                            if edit_mode not in [-1, 5, 6, 8]:
                                 grid = mark_cell(screen, s, grid, (i, j), edit_mode)
             
         pygame.display.update()
@@ -359,20 +406,20 @@ def main(algo):
 
 
 if __name__ == "__main__":
-    try:
-        opts, args = getopt(sys.argv[1:], "ha:", ["algo="])
-    except GetoptError:
-        print_usage()
-        sys.exit(2)
+    #try:
+    #    opts, args = getopt(sys.argv[1:], "ha:", ["algo="])
+    #except GetoptError:
+    #    print_usage()
+    #    sys.exit(2)
 
-    # default
-    algo = 1
+    ## default
+    #algo = 1
 
-    for opt, arg in opts:
-        if opt == "-h":
-            print_usage()
-            sys.exit()
-        elif opt in ("-a", "--algo"):
-            algo = arg
+    #for opt, arg in opts:
+    #    if opt == "-h":
+    #        print_usage()
+    #        sys.exit()
+    #    elif opt in ("-a", "--algo"):
+    #        algo = arg
 
-    main(algo)
+    main()
