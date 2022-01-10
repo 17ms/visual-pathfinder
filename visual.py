@@ -1,10 +1,8 @@
 #!/usr/bin/env python
-import pygame, sys, random
-from math import sqrt
+import pygame, random
 from pygame.locals import *
 from collections import defaultdict
 from sys import maxsize
-from getopt import GetoptError, getopt
 
 WHITE = (255, 255, 255)
 GRAY = (125, 125, 125)
