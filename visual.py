@@ -24,10 +24,6 @@ grid_size = 60
 edited_squares = []
 
 
-def print_usage():
-    pass
-
-
 def dijkstra(screen, grid, start, end, squares):
     global edited_squares
     
@@ -45,7 +41,7 @@ def dijkstra(screen, grid, start, end, squares):
         if cur == end:
             print(f"distance: {str(distance)}")
             break
-        elif cur in visited:
+        elif cur in visited or grid[cur[0]][cur[1]] == maxsize:
             continue
         else:
             visited.add(cur)
@@ -81,10 +77,6 @@ def dijkstra(screen, grid, start, end, squares):
             pygame.display.update()
 
     # backtrack & visualize the path
-    backtrack(screen, start, end, squares, gw, gh, minimums)
-
-
-def backtrack(screen, start, end, squares, gw, gh, minimums):
     cur = end
     visited = []
     lowest = maxsize
@@ -144,7 +136,7 @@ def a_star(screen, grid, start, end, squares):
         if cur == end:
             print(f"distance: {str(distance)}")
             break
-        elif cur in closed:
+        elif cur in closed or grid[cur[0]][cur[1]] == maxsize:
             continue
         else:
             closed.add(cur)
@@ -301,9 +293,7 @@ def reset_grid(screen, squares, grid_size):
 def algo_label_update(screen, pos, old):
     global algo, algo_names
     # write over old
-    if old:
-        screen.fill((0, 0, 0), (pos[0], pos[1], 50, 30))
-
+    screen.fill((0, 0, 0), (pos[0], pos[1], 50, 30))
     old = algo_names[algo]
     label = pygame.font.SysFont("Ubuntu", 13).render(old, 1, WHITE)
     screen.blit(label, pos)
@@ -326,10 +316,11 @@ def main():
     grid, squares = setup_grid(grid_size, size, screen)
     buttons, last_pos = setup_buttons(screen)
     algo_label1 = pygame.font.SysFont("Ubuntu", 13).render("Algorithm: ", 1, WHITE)
-    label_w, label_h = algo_label1.get_size()
+    lw, lh = algo_label1.get_size()
     screen.blit(algo_label1, (last_pos[0], last_pos[1]))
-    last_pos = (last_pos[0]+label_w+4, last_pos[1])
-    current_algo_name = None
+    last_pos = (last_pos[0]+lw+4, last_pos[1])
+    current_algo_name = algo_names[algo]
+    current_algo_name = algo_label_update(screen, last_pos, current_algo_name)
 
     done = 0
     while not done:
@@ -404,20 +395,4 @@ def main():
 
 
 if __name__ == "__main__":
-    #try:
-    #    opts, args = getopt(sys.argv[1:], "ha:", ["algo="])
-    #except GetoptError:
-    #    print_usage()
-    #    sys.exit(2)
-
-    ## default
-    #algo = 1
-
-    #for opt, arg in opts:
-    #    if opt == "-h":
-    #        print_usage()
-    #        sys.exit()
-    #    elif opt in ("-a", "--algo"):
-    #        algo = arg
-
     main()

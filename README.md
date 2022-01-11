@@ -1,5 +1,5 @@
-## Pathfinding visualizer in pygame
+## Pathfinding visualizer for Dijkstra and A*
 
-### Currently included algorithms
+### Useful sources
 * [Dijkstra's algorithm](https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm)
 * [A* search algorithm](https://en.wikipedia.org/wiki/A*_search_algorithm)
