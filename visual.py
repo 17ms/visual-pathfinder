@@ -1,5 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import pygame, random
+from a_star import PriorityQueue
 from pygame.locals import *
 from collections import defaultdict
 from sys import maxsize
@@ -47,20 +48,9 @@ def dijkstra(screen, grid, start, end, squares):
             visited.add(cur)
             if cur != start:
                 pygame.draw.rect(screen, DARK_GREEN, squares[cur[0]][cur[1]])
-                edited_squares.append(squares[cur[0]][cur[1]])
-
-        # calculate weights for neighbours
-        t, b = (cur[0]-1, cur[1]), (cur[0]+1, cur[1])
-        l, r = (cur[0], cur[1]-1), (cur[0], cur[1]+1)
-        tl, tr = (cur[0]-1, cur[1]-1), (cur[0]-1, cur[1]+1)
-        bl, br = (cur[0]+1, cur[1]-1), (cur[0]+1, cur[1]+1)
         
-        for n in [t, b, l, r, tl, tr, bl, br]:
-            if n[0] < 0 or n[0] > gw-1:
-                continue
-            elif n[1] < 0 or n[1] > gh-1:
-                continue
-            elif n in visited or grid[n[0]][n[1]] == maxsize:
+        for n in get_neighbours(cur, gh, gw, start, end, grid, visited, screen, squares):
+            if n in visited or grid[n[0]][n[1]] == maxsize:
                 continue
 
             if n != end:
@@ -83,15 +73,8 @@ def dijkstra(screen, grid, start, end, squares):
     next = None
 
     while True:
-        t, b = (cur[0]-1, cur[1]), (cur[0]+1, cur[1])
-        l, r = (cur[0], cur[1]-1), (cur[0], cur[1]+1)
-        tl, tr = (cur[0]-1, cur[1]-1), (cur[0]-1, cur[1]+1)
-        bl, br = (cur[0]+1, cur[1]-1), (cur[0]+1, cur[1]+1)
-
-        for n in [t, b, l, r, tl, tr, bl, br]:
-            if gw-1 < n[0] < 0 or gh-1 < n[1] < 0:
-                continue
-            elif n in visited:
+        for n in get_neighbours(cur, gh, gw, start, end, grid, visited, screen, squares, True):
+            if n in visited:
                 continue
             elif n == start:
                 pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
@@ -115,64 +98,66 @@ def dijkstra(screen, grid, start, end, squares):
 
 def a_star(screen, grid, start, end, squares):
     global edited_squares
-    
+
     gh, gw = len(grid), len(grid[0])
-    que = defaultdict(tuple)
-    que[start] = (0, 0, 0)  # (g, h, f)
-    closed = set()
-    parents = defaultdict(tuple)
+    que = PriorityQueue()
+    closed_list = set()
+    que.add(start)
+    distance = {start: 0}
+    parents = dict()
 
     while que:
-        distance = maxsize
-        cur_values = None
-        for q in que.values():
-            if q[2] < distance:
-                distance = q[2]
-                cur = list(que.keys())[list(que.values()).index(q)]
-                cur_values = q
-
-        que.pop(cur)
-
-        if cur == end:
-            print(f"distance: {str(distance)}")
-            break
-        elif cur in closed or grid[cur[0]][cur[1]] == maxsize:
+        cur = que.pop()
+        if cur in closed_list or grid[cur[0]][cur[1]] == maxsize:
             continue
+        elif cur == end:
+            print(f"distance: {str(distance[cur])}")
+            follow_parents(start, end, parents, screen, squares)
+            return
         else:
-            closed.add(cur)
+            closed_list.add(cur)
             if cur != start:
                 pygame.draw.rect(screen, DARK_GREEN, squares[cur[0]][cur[1]])
-                edited_squares.append(squares[cur[0]][cur[1]])
 
-        # calculate weights for neighbours
-        t, b = (cur[0]-1, cur[1]), (cur[0]+1, cur[1])
-        l, r = (cur[0], cur[1]-1), (cur[0], cur[1]+1)
-        tl, tr = (cur[0]-1, cur[1]-1), (cur[0]-1, cur[1]+1)
-        bl, br = (cur[0]+1, cur[1]-1), (cur[0]+1, cur[1]+1)
+        for n in get_neighbours(cur, gh, gw, start, end, grid, closed_list, screen, squares):
+            if n in closed_list:
+                continue
+            else:
+                que.add(n, priority=distance[cur]+1+heuristic(n, end))
+            
+            if n not in distance or distance[cur]+1 < distance[n]:
+                distance[n] = distance[cur]+1
+                parents[n] = cur
 
-        for n in [t, b, l, r, tl, tr, bl, br]:
-            if n[0] < 0 or n[0] > gw-1:
-                continue
-            elif n[1] < 0 or n[1] > gh-1:
-                continue
-            elif n in closed or grid[n[0]][n[1]] == maxsize:
-                continue
+        # update grid visuals
+        pygame.display.update()
 
-            if n != end:
+    print("no possible path found")
+
+
+def get_neighbours(pos, gh, gw, start, end, grid, closed_list, screen, squares, result = False):
+    global edited_squares
+
+    tl, t, tr = (pos[0]-1, pos[1]-1), (pos[0]-1, pos[1]), (pos[0]-1, pos[1]+1)
+    bl, b, br = (pos[0]+1, pos[1]-1), (pos[0]+1, pos[1]), (pos[0]+1, pos[1]+1)
+    n_list = []
+
+    for n in [tl, t, tr, bl, b, br]:
+        if 0 <= n[0] < gw and 0 <= n[1] < gh and grid[n[0]][n[1]] != maxsize:
+            n_list.append(n)
+            if n != start and n != end and not result and n not in closed_list:
                 pygame.draw.rect(screen, GREEN, squares[n[0]][n[1]])
                 edited_squares.append(squares[n[0]][n[1]])
 
-            gcost = cur_values[0]+1
-            #hcost = round(sqrt((end[0]-n[0])**2 + (end[1]-n[1])**2))
-            hcost = (end[0]-n[0])**2 + (end[1]-n[1])**2
-            fcost = gcost + hcost
-            que[n] = (gcost, hcost, fcost)
-            parents[n] = cur
+    return n_list
 
-            # update grid visuals
-            pygame.display.update()
 
-    # backtrack & visualize through parent nodes
+def heuristic(pos, end):
+    return max(abs(pos[0]-end[0]), abs(pos[1]-end[1]))
+
+
+def follow_parents(start, end, parents, screen, squares):
+    # TODO fix
     cur = parents[end]
     while cur != start:
         pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
