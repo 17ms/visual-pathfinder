@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import pygame, random, math
-from a_star import PriorityQueue
+from queue import PriorityQueue
 from pygame.locals import *
 from collections import defaultdict
 from sys import maxsize
+from time import sleep
 
 WHITE = (255, 255, 255)
 GRAY = (125, 125, 125)
@@ -23,32 +24,31 @@ start_cell, end_cell = None, None
 start_xy, end_xy = None, None
 grid_size = 60
 edited_squares = []
+delay = 0.003
 
 
 def dijkstra(screen, grid, start, end, squares):
     global edited_squares
     
     gh, gw = len(grid), len(grid[0])
-    que = defaultdict(tuple)
-    que[start] = 0
+    que = PriorityQueue()
     closed_list = set()
+    que.add(start)
     minimums = defaultdict(lambda: maxsize)
+    minimums[start] = 0
 
     while que:
-        distance = min(que.values())
-        cur = list(que.keys())[list(que.values()).index(distance)]
-        que.pop(cur)
-
-        if cur == end:
-            print(f"distance: {str(distance)}")
-            break
-        elif cur in closed_list or grid[cur[0]][cur[1]] == maxsize:
+        cur = que.pop()
+        if cur in closed_list or grid[cur[0]][cur[1]] == maxsize:
             continue
+        elif cur == end:
+            print(f"distance: {str(minimums[cur])}")
+            follow_minimums(start, end, gw, gh, minimums, screen, squares)
+            return
         else:
             closed_list.add(cur)
             if cur != start:
                 pygame.draw.rect(screen, DARK_GREEN, squares[cur[0]][cur[1]])
-                edited_squares.append(squares[cur[0]][cur[1]])
 
         for n in get_neighbours(cur):
             if n[0] < 0 or n[0] > gw-1:
@@ -57,50 +57,50 @@ def dijkstra(screen, grid, start, end, squares):
                 continue
             elif n in closed_list or grid[n[0]][n[1]] == maxsize:
                 continue
+            else:
+                if n != end and n != start:
+                    pygame.draw.rect(screen, GREEN, squares[n[0]][n[1]])
+                    edited_squares.append(squares[n[0]][n[1]])
+                
+                n_distance = minimums[cur]+grid[n[0]][n[1]]
+                if n_distance < minimums[n]:
+                    minimums[n] = n_distance
+                    que.add(n, priority=n_distance)
 
-            if n != end:
-                pygame.draw.rect(screen, GREEN, squares[n[0]][n[1]])
-                edited_squares.append(squares[n[0]][n[1]])
+        # update grid visuals
+        pygame.display.update()
+        sleep(delay)
 
-            n_weigh = grid[n[0]][n[1]]
-            n_distance = distance + n_weigh
-            if n_distance < minimums[n]:
-                minimums[n] = n_distance
-                que[n] = n_distance
+    print("no possible path found")
 
-            # update grid visuals
-            pygame.display.update()
 
-    # backtrack & visualize the path
+def follow_minimums(start, end, gw, gh, minimums, screen, squares):
     cur = end
     closed_list = []
-    lowest = maxsize
-    next = None
+    l = maxsize
+    nxt = None
 
     while True:
         for n in get_neighbours(cur):
-            if gw-1 < n[0] < 0 or gh-1 < n[1] < 0:
+            if n[0] < 0 or n[0] > gw-1:
+                continue
+            elif n[1] < 0 or n[1] > gh-1:
                 continue
             elif n in closed_list:
                 continue
             elif n == start:
                 pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
                 return
+        
+            if minimums[n] < l:
+                l = minimums[n]
+                nxt = n
 
-            if minimums[n] < lowest:
-                lowest = minimums[n]
-                next = n
-
-        if cur != end: 
+        if cur != end:
             pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
 
         closed_list.append(cur)
-
-        if next is None:
-            print("no possible path found")
-            return
-
-        cur = next
+        cur = nxt
 
 
 def a_star(screen, grid, start, end, squares):
@@ -139,12 +139,13 @@ def a_star(screen, grid, start, end, squares):
             if n not in distance or distance[cur]+1 < distance[n]:
                 distance[n] = distance[cur]+1
                 parents[n] = cur
-                if n != end:
+                if n != end and n != start:
                     pygame.draw.rect(screen, GREEN, squares[n[0]][n[1]])
                     edited_squares.append(squares[n[0]][n[1]])
 
         # update grid visuals
         pygame.display.update()
+        sleep(delay)
 
     print("no possible path found")
 
@@ -171,7 +172,7 @@ def follow_parents(start, end, parents, screen, squares):
 
 def setup_grid(grid_size, size, screen):
     margin = 1
-    margin_removed = size - (grid_size + 1) * margin
+    margin_removed = size - grid_size * margin
     node_size = round(margin_removed / grid_size)
     squares = []
     for r in range(grid_size):
@@ -187,20 +188,20 @@ def setup_grid(grid_size, size, screen):
 
 
 def setup_buttons(screen):
-    start_label = pygame.font.SysFont("Ubuntu", 11).render("Set Start", 1, WHITE)
-    end_label = pygame.font.SysFont("Ubuntu", 11).render("Set End", 1, WHITE)
-    obs_label = pygame.font.SysFont("Ubuntu", 11).render("Set Obs.", 1, WHITE)
-    random_label = pygame.font.SysFont("Ubuntu", 11).render("Randomize", 1, WHITE)
-    clear_label = pygame.font.SysFont("Ubuntu", 11).render("Clear (1)", 1, WHITE)
-    clean_label = pygame.font.SysFont("Ubuntu", 11).render("Clean", 1, WHITE)
-    reset_label = pygame.font.SysFont("Ubuntu", 11).render("Reset", 1, WHITE)
-    switch_label = pygame.font.SysFont("Ubuntu", 11).render("Switch", 1, WHITE)
-    findpath_label = pygame.font.SysFont("Ubuntu", 11).render("Find Path", 1, WHITE)
+    start_label = pygame.font.SysFont("Ubuntu", 15).render("Set Start", 1, WHITE)
+    end_label = pygame.font.SysFont("Ubuntu", 15).render("Set End", 1, WHITE)
+    obs_label = pygame.font.SysFont("Ubuntu", 15).render("Set Obs.", 1, WHITE)
+    random_label = pygame.font.SysFont("Ubuntu", 15).render("Randomize", 1, WHITE)
+    clear_label = pygame.font.SysFont("Ubuntu", 15).render("Clear (1)", 1, WHITE)
+    clean_label = pygame.font.SysFont("Ubuntu", 15).render("Clean", 1, WHITE)
+    reset_label = pygame.font.SysFont("Ubuntu", 15).render("Reset", 1, WHITE)
+    switch_label = pygame.font.SysFont("Ubuntu", 15).render("Switch", 1, WHITE)
+    findpath_label = pygame.font.SysFont("Ubuntu", 15).render("Find Path", 1, WHITE)
 
     labels = [start_label, end_label, obs_label, random_label, clear_label, clean_label, reset_label, switch_label, findpath_label]
     buttons = []
     margin = 3
-    next = (2, 605)
+    next = (2, 905)
 
     for l in labels:
         w, h = l.get_size()
@@ -227,6 +228,8 @@ def mark_cell(screen, rect, grid, xy, mode):
             pygame.draw.rect(screen, modes[mode], rect)
         start_cell = rect
         start_xy = xy
+        if grid[xy[0]][xy[1]] == maxsize:
+            grid[xy[0]][xy[1]] = 1
     elif mode == 1:
         # end
         if end_cell:
@@ -236,6 +239,8 @@ def mark_cell(screen, rect, grid, xy, mode):
             pygame.draw.rect(screen, modes[mode], rect)
         end_cell = rect
         end_xy = xy
+        if grid[xy[0]][xy[1]] == maxsize:
+            grid[xy[0]][xy[1]] = 1
     elif mode == 4:
         # clear
         pygame.draw.rect(screen, WHITE, rect)
@@ -283,9 +288,9 @@ def reset_grid(screen, squares, grid_size):
 def algo_label_update(screen, pos, old):
     global algo, algo_names
     # write over old
-    screen.fill((0, 0, 0), (pos[0], pos[1], 50, 30))
+    screen.fill((0, 0, 0), (pos[0], pos[1], 100, 30))
     old = algo_names[algo]
-    label = pygame.font.SysFont("Ubuntu", 13).render(old, 1, WHITE)
+    label = pygame.font.SysFont("Ubuntu", 15).render(old, 1, WHITE)
     screen.blit(label, pos)
     
     return old
@@ -296,8 +301,8 @@ def main():
     global start_cell, end_cell, start_xy, end_xy
 
     pygame.init()
-    size = 600
-    screen = pygame.display.set_mode([size+1, size+25])
+    size = 900
+    screen = pygame.display.set_mode([size+1, size+30])
     pygame.display.set_caption("visual-pathfinder")
     clock = pygame.time.Clock()
     
@@ -305,7 +310,7 @@ def main():
     screen.fill((0, 0, 0))
     grid, squares = setup_grid(grid_size, size, screen)
     buttons, last_pos = setup_buttons(screen)
-    algo_label1 = pygame.font.SysFont("Ubuntu", 13).render("Algorithm: ", 1, WHITE)
+    algo_label1 = pygame.font.SysFont("Ubuntu", 15).render("Algorithm: ", 1, WHITE)
     lw, lh = algo_label1.get_size()
     screen.blit(algo_label1, (last_pos[0], last_pos[1]))
     last_pos = (last_pos[0]+lw+4, last_pos[1])
@@ -337,6 +342,7 @@ def main():
                             if edited_squares:
                                 for s in edited_squares:
                                     pygame.draw.rect(screen, WHITE, s)
+                                edited_squares = []
                             grid = reset_grid(screen, squares, grid_size)
                             start_cell, start_xy = None, None
                             end_cell, end_xy = None, None
@@ -369,14 +375,12 @@ def main():
                             else:
                                 print("ERROR: start/end missing")
 
-                        print(f"edit_mode = {str(i)}")
                         edit_mode = i
 
                 # choose cell to edit
                 for i, r in enumerate(squares):
                     for j, s in enumerate(r):
                         if s.collidepoint(mouse):
-                            print(f"collides [{str(edit_mode)}]")
                             if edit_mode not in [-1, 5, 6, 8]:
                                 grid = mark_cell(screen, s, grid, (i, j), edit_mode)
             
