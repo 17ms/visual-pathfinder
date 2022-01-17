@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+from email import message
 import pygame, random, math
 from queue import PriorityQueue
 from pygame.locals import *
 from collections import defaultdict
+from tkinter import Tk, messagebox
 from sys import maxsize
 from time import sleep
 
@@ -42,9 +44,8 @@ def dijkstra(screen, grid, start, end, squares):
         if cur in closed_list or grid[cur[0]][cur[1]] == maxsize:
             continue
         elif cur == end:
-            print(f"distance: {str(minimums[cur])}")
             follow_minimums(start, end, gw, gh, minimums, screen, squares)
-            return
+            return minimums[cur]
         else:
             closed_list.add(cur)
             if cur != start:
@@ -71,7 +72,7 @@ def dijkstra(screen, grid, start, end, squares):
         pygame.display.update()
         sleep(delay)
 
-    print("no possible path found")
+    return 0
 
 
 def follow_minimums(start, end, gw, gh, minimums, screen, squares):
@@ -90,6 +91,7 @@ def follow_minimums(start, end, gw, gh, minimums, screen, squares):
                 continue
             elif n == start:
                 pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
+                pygame.display.update()
                 return
         
             if minimums[n] < l:
@@ -118,9 +120,8 @@ def a_star(screen, grid, start, end, squares):
         if cur in closed_list or grid[cur[0]][cur[1]] == maxsize:
             continue
         elif cur == end:
-            print(f"distance: {str(distance[cur])}")
             follow_parents(start, end, parents, screen, squares)
-            return
+            return distance[cur]
         else:
             closed_list.add(cur)
             if cur != start:
@@ -147,7 +148,7 @@ def a_star(screen, grid, start, end, squares):
         pygame.display.update()
         sleep(delay)
 
-    print("no possible path found")
+    return 0
 
 
 def get_neighbours(pos):
@@ -159,8 +160,12 @@ def get_neighbours(pos):
 
 
 def h_cost(pos, end):
-    # euclidean distance
-    return math.sqrt((pos[0]-end[0])**2 + (pos[1]-end[1])**2)
+    # http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
+    dx = abs(pos[0]-end[0])
+    dy = abs(pos[1]-end[1])
+    d1, d2 = 1, 1
+
+    return d1*(dx+dy) + (d2-2*d1) * min(dx, dy)
 
 
 def follow_parents(start, end, parents, screen, squares):
@@ -168,6 +173,7 @@ def follow_parents(start, end, parents, screen, squares):
     while cur != start:
         pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
         cur = parents[cur]
+    pygame.display.update()
 
 
 def setup_grid(grid_size, size, screen):
@@ -175,6 +181,7 @@ def setup_grid(grid_size, size, screen):
     margin_removed = size - grid_size * margin
     node_size = round(margin_removed / grid_size)
     squares = []
+
     for r in range(grid_size):
         sl = []
         for c in range(grid_size):
@@ -184,6 +191,7 @@ def setup_grid(grid_size, size, screen):
             pygame.draw.rect(screen, WHITE, rect)
             sl.append(rect)
         squares.append(sl)
+
     return [[1 for i in range(grid_size)] for ii in range(grid_size)], squares
 
 
@@ -296,6 +304,17 @@ def algo_label_update(screen, pos, old):
     return old
 
 
+def display_result(distance):
+    Tk().wm_withdraw()
+    msg = f"Distance: {str(distance)}"
+    messagebox.showinfo("Done", msg)
+
+
+def display_error(msg):
+    Tk().wm_withdraw()
+    messagebox.showerror("Error", msg)
+
+
 def main():
     global edit_mode, grid_size, edited_squares, algo
     global start_cell, end_cell, start_xy, end_xy
@@ -359,7 +378,6 @@ def main():
                             start_cell, start_xy = None, None
                             end_cell, end_xy = None, None
                         elif i == 7:
-                            # TODO update algo-variable
                             if algo == len(algo_names)-1:
                                 algo = 0
                             else:
@@ -369,11 +387,15 @@ def main():
                             # algo
                             if start_cell and end_cell:
                                 if algo == 0:
-                                    dijkstra(screen, grid, start_xy, end_xy, squares)
+                                    result = dijkstra(screen, grid, start_xy, end_xy, squares)
                                 elif algo == 1:
-                                    a_star(screen, grid, start_xy, end_xy, squares)
+                                    result = a_star(screen, grid, start_xy, end_xy, squares)
+                                if result:
+                                    display_result(result)
+                                else:
+                                    display_error("No possible path.")
                             else:
-                                print("ERROR: start/end missing")
+                                display_error("Start or end not set.")
 
                         edit_mode = i
 
