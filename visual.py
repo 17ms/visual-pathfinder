@@ -286,7 +286,7 @@ def reset_grid(screen, squares, grid_size):
 
 
 def algo_label_update(screen, pos, old):
-    global algo, ALGO_NAMES
+    global algo
 
     screen.fill((0, 0, 0), (pos[0], pos[1], 100, 30))
     old = ALGO_NAMES[algo]
