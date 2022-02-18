@@ -297,9 +297,11 @@ def algo_label_update(screen, pos, old):
 
 
 def display_result(distance):
-    Tk().wm_withdraw()
+    window = Tk()
+    window.wm_withdraw()
     msg = f"Distance: {str(distance)}"
     messagebox.showinfo("Done", msg)
+    window.update()
 
 
 def display_error(msg):
