@@ -1,417 +1,240 @@
 #!/usr/bin/env python3
 import pygame
+import sys
 import random
-from queue import PriorityQueue
-from pygame.locals import *
-from constants import *
-from collections import defaultdict
 from tkinter import Tk, messagebox
-from sys import maxsize
-from time import sleep
-
-
-algo = 0
-edit_mode = -1
-start_cell, end_cell = None, None
-start_xy, end_xy = None, None
-grid_size = 60
-gw, gh = None, None
-edited_squares = []
-delay = 0.003
-
-
-def dijkstra(screen, grid, start, end, squares):
-    global edited_squares, gh, gw
-
-    que = PriorityQueue()
-    closed_list = set()
-    que.add(start)
-    minimums = defaultdict(lambda: maxsize)
-    minimums[start] = 0
-
-    while que:
-        cur = que.pop()
-        if cur in closed_list or grid[cur[0]][cur[1]] == maxsize:
-            continue
-        elif cur == end:
-            follow_minimums(start, end, minimums, screen, squares)
-            return minimums[cur]
-        else:
-            closed_list.add(cur)
-            if cur != start:
-                pygame.draw.rect(screen, DARK_GREEN, squares[cur[0]][cur[1]])
-
-        for n in get_neighbours(cur):
-            if n[0] < 0 or n[0] > gw-1 or n[1] < 0 or n[1] > gh-1:
-                continue
-            elif n in closed_list or grid[n[0]][n[1]] == maxsize:
-                continue
-            else:
-                if n != end and n != start:
-                    pygame.draw.rect(screen, LIGHT_GREEN, squares[n[0]][n[1]])
-                    edited_squares.append(squares[n[0]][n[1]])
-                n_distance = minimums[cur]+grid[n[0]][n[1]]
-                if n_distance < minimums[n]:
-                    minimums[n] = n_distance
-                    que.add(n, priority=n_distance)
-
-        pygame.display.update()
-        sleep(delay)
-
-    return 0
-
-
-def follow_minimums(start, end, minimums, screen, squares):
-    global gh, gw
-
-    cur = end
-    closed_list = []
-    l = maxsize
-    nxt = None
-
-    while True:
-        for n in get_neighbours(cur):
-            if n[0] < 0 or n[0] > gw-1 or n[1] < 0 or n[1] > gh-1:
-                continue
-            elif n in closed_list:
-                continue
-            elif n == start:
-                pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
-                pygame.display.update()
-                return
-
-            if minimums[n] < l:
-                l = minimums[n]
-                nxt = n
-
-        if cur != end:
-            pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
-
-        closed_list.append(cur)
-        cur = nxt
-
-
-def a_star(screen, grid, start, end, squares):
-    global edited_squares, gh, gw
-
-    que = PriorityQueue()
-    closed_list = set()
-    que.add(start)
-    distance = {start: 0}
-    parents = dict()
-
-    while que:
-        cur = que.pop()
-        if cur in closed_list or grid[cur[0]][cur[1]] == maxsize:
-            continue
-        elif cur == end:
-            follow_parents(start, end, parents, screen, squares)
-            return distance[cur]
-        else:
-            closed_list.add(cur)
-            if cur != start:
-                pygame.draw.rect(screen, DARK_GREEN, squares[cur[0]][cur[1]])
-
-        for n in get_neighbours(cur):
-            if n[0] < 0 or n[0] > gw-1 or n[1] < 0 or n[1] > gh-1:
-                continue
-            elif n in closed_list or grid[n[0]][n[1]] == maxsize:
-                continue
-            else:
-                que.add(n, priority=distance[cur]+1+h_cost(n, end))
-
-            if n not in distance or distance[cur]+1 < distance[n]:
-                distance[n] = distance[cur]+1
-                parents[n] = cur
-                if n != end and n != start:
-                    pygame.draw.rect(screen, LIGHT_GREEN, squares[n[0]][n[1]])
-                    edited_squares.append(squares[n[0]][n[1]])
-
-        pygame.display.update()
-        sleep(delay)
-
-    return 0
-
-
-def get_neighbours(pos):
-    tl, t, tr = (pos[0]-1, pos[1]-1), (pos[0]-1, pos[1]), (pos[0]-1, pos[1]+1)
-    bl, b, br = (pos[0]+1, pos[1]-1), (pos[0]+1, pos[1]), (pos[0]+1, pos[1]+1)
-    l, r = (pos[0], pos[1]-1), (pos[0], pos[1]+1)
-
-    return [t, b, l, r, tl, tr, bl, br]
-
-
-def h_cost(pos, end):
-    # http://theory.stanford.edu/~amitp/GameProgramming/Heuristics.html
-    dx = abs(pos[0]-end[0])
-    dy = abs(pos[1]-end[1])
-    d1, d2 = 1, 1
-
-    return d1*(dx+dy) + (d2-2*d1) * min(dx, dy)
-
-
-def follow_parents(start, end, parents, screen, squares):
-    cur = parents[end]
-    while cur != start:
-        pygame.draw.rect(screen, ORANGE, squares[cur[0]][cur[1]])
-        cur = parents[cur]
-    pygame.display.update()
-
-
-def setup_grid(grid_size, size, screen):
-    margin = 1
-    margin_removed = size - grid_size * margin
-    node_size = round(margin_removed / grid_size)
-    squares = []
-
-    for r in range(grid_size):
-        sl = []
-        for c in range(grid_size):
-            x = margin + c * (margin + node_size)
-            y = margin + r * (margin + node_size)
-            rect = pygame.Rect(x, y, node_size, node_size)
-            pygame.draw.rect(screen, WHITE, rect)
-            sl.append(rect)
-        squares.append(sl)
-
-    return [[1 for i in range(grid_size)] for ii in range(grid_size)], squares
-
-
-def setup_buttons(screen):
-    start_label = pygame.font.SysFont(
-        "Ubuntu", 15).render("Set Start", 1, WHITE)
-    end_label = pygame.font.SysFont("Ubuntu", 15).render("Set End", 1, WHITE)
-    obs_label = pygame.font.SysFont("Ubuntu", 15).render("Set Obs.", 1, WHITE)
-    random_label = pygame.font.SysFont(
-        "Ubuntu", 15).render("Randomize", 1, WHITE)
-    clear_label = pygame.font.SysFont(
-        "Ubuntu", 15).render("Clear (1)", 1, WHITE)
-    clean_label = pygame.font.SysFont("Ubuntu", 15).render("Clean", 1, WHITE)
-    reset_label = pygame.font.SysFont("Ubuntu", 15).render("Reset", 1, WHITE)
-    switch_label = pygame.font.SysFont("Ubuntu", 15).render("Switch", 1, WHITE)
-    findpath_label = pygame.font.SysFont(
-        "Ubuntu", 15).render("Find Path", 1, WHITE)
-
-    labels = [start_label, end_label, obs_label, random_label,
-              clear_label, clean_label, reset_label, switch_label, findpath_label]
-    buttons = []
-    margin = 3
-    next = (2, 905)
-
-    for l in labels:
-        w, h = l.get_size()
-        bg_button = pygame.Rect(next[0], next[1], w+8, h+4)
-        pygame.draw.rect(screen, WHITE, bg_button, 1)
-        buttons.append(bg_button)
-        screen.blit(l, (next[0]+4, next[1]+2))
-        next = (next[0]+w+8+margin, next[1])
-
-    last_pos = (next[0]+8, next[1]+1)
-
-    return buttons, last_pos
-
-
-def mark_cell(screen, rect, grid, xy, mode):
-    global start_cell, end_cell, start_xy, end_xy
-
-    if mode == 0:
-        # start
-        if start_cell:
-            pygame.draw.rect(screen, WHITE, start_cell)
-            pygame.draw.rect(screen, MARK_MODES[mode], rect)
-        else:
-            pygame.draw.rect(screen, MARK_MODES[mode], rect)
-        start_cell = rect
-        start_xy = xy
-        if grid[xy[0]][xy[1]] == maxsize:
-            grid[xy[0]][xy[1]] = 1
-    elif mode == 1:
-        # end
-        if end_cell:
-            pygame.draw.rect(screen, WHITE, end_cell)
-            pygame.draw.rect(screen, MARK_MODES[mode], rect)
-        else:
-            pygame.draw.rect(screen, MARK_MODES[mode], rect)
-        end_cell = rect
-        end_xy = xy
-        if grid[xy[0]][xy[1]] == maxsize:
-            grid[xy[0]][xy[1]] = 1
-    elif mode == 4:
-        # clear
-        pygame.draw.rect(screen, WHITE, rect)
-        if rect == end_cell:
-            end_cell, end_xy = None, None
-        elif rect == start_cell:
-            start_cell, start_xy = None, None
-        elif grid[xy[0]][xy[1]] == maxsize:
-            grid[xy[0]][xy[1]] = 1
-
-    return grid
-
-
-def paint_obstacle(screen, grid, squares):
-    mouse = pygame.mouse.get_pos()
-    click = pygame.mouse.get_pressed()
-    if click[0] == True:
-        for y, r in enumerate(squares):
-            for x, s in enumerate(r):
-                if s.collidepoint(mouse):
-                    pygame.draw.rect(screen, BLACK, s)
-                    grid[y][x] = maxsize
-
-    return grid
-
-
-def random_obstacles(screen, grid, squares):
-    for y, r in enumerate(squares):
-        for x, s in enumerate(r):
-            if random.getrandbits(1):
-                pygame.draw.rect(screen, BLACK, s)
-                grid[y][x] = maxsize
-
-    return grid
-
-
-def reset_grid(screen, squares, grid_size):
-    global start_cell, start_xy, end_cell, end_xy
-
-    start_cell, start_xy = None, None
-    end_cell, end_xy = None, None
-
-    for r in squares:
-        for s in r:
-            pygame.draw.rect(screen, WHITE, s)
-
-    return [[1 for i in range(grid_size)] for ii in range(grid_size)]
-
-
-def algo_label_update(screen, pos, old):
-    global algo
-
-    screen.fill((0, 0, 0), (pos[0], pos[1], 100, 30))
-    old = ALGO_NAMES[algo]
-    label = pygame.font.SysFont("Ubuntu", 15).render(old, 1, WHITE)
-    screen.blit(label, pos)
-
-    return old
-
-
-def display_result(distance):
-    window = Tk()
-    window.wm_withdraw()
-    msg = f"Distance: {str(distance)}"
-    messagebox.showinfo("Done", msg)
-    window.update()
-
-
-def display_error(msg):
-    Tk().wm_withdraw()
-    messagebox.showerror("Error", msg)
-
-
-def main():
-    global edit_mode, grid_size, edited_squares, algo
-    global start_cell, end_cell, start_xy, end_xy
-    global gh, gw
-
-    pygame.init()
-    size = 900
-    screen = pygame.display.set_mode([size+1, size+30])
-    pygame.display.set_caption("visual-pathfinder")
-    clock = pygame.time.Clock()
-
-    # visual elements
-    screen.fill((0, 0, 0))
-    grid, squares = setup_grid(grid_size, size, screen)
-    gh, gw = len(grid), len(grid[0])
-    buttons, last_pos = setup_buttons(screen)
-
-    algo_label1 = pygame.font.SysFont(
-        "Ubuntu", 15).render("Algorithm: ", 1, WHITE)
-    lw, lh = algo_label1.get_size()
-    screen.blit(algo_label1, (last_pos[0], last_pos[1]))
-    last_pos = (last_pos[0]+lw+4, last_pos[1])
-    current_algo_name = ALGO_NAMES[algo]
-    current_algo_name = algo_label_update(screen, last_pos, current_algo_name)
-
-    done = 0
-    while not done:
-        mouse = pygame.mouse.get_pos()
-
-        if edit_mode == 2:
-            grid = paint_obstacle(screen, grid, squares)
-
-        for b in buttons:
+from constants import Colours
+from algorithms import Dijkstra, AStar
+
+
+class MessageBox:
+
+    def __init__(self):
+        self.window = Tk()
+        self.window.wm_withdraw()
+
+    def show_error(self, msg):
+        messagebox.showerror("Error", msg)
+
+    def show_info(self, msg):
+        messagebox.showinfo("Done", msg)
+
+    def update_and_destroy(self):
+        self.window.update()
+        self.window.destroy()
+
+
+class Visual:
+
+    def __init__(self, font):
+        self.mark_mode_colours = {
+            0: Colours.BLUE.value,
+            1: Colours.PURPLE.value,
+            2: Colours.BLACK.value,
+            3: Colours.WHITE.value
+        }
+        self.window_size = 900
+        self.screen = pygame.display.set_mode([self.window_size + 1, self.window_size + 30])
+        self.screen.fill(Colours.PURE_BLACK.value)
+        self.algo_selection = 0
+        self.edit_mode = -1
+        self.grid_size = 60
+        self.algo_names = ["Dijkstra", "A*"]
+        self.font = font
+        self.start_cell = self.end_cell = None
+        self.start_xy = self.end_xy = None
+        self.edited_squares = []
+        self.squares = []
+        self.buttons = []
+
+        def setup_grid():
+            margin = 1
+            margin_removed = self.window_size - self.grid_size * margin
+            square_size = round(margin_removed / self.grid_size)
+
+            for r in range(self.grid_size):
+                sublist = []
+                for c in range(self.grid_size):
+                    x = margin + c * (margin + square_size)
+                    y = margin + r * (margin + square_size)
+                    rect = pygame.Rect(x, y, square_size, square_size)
+                    pygame.draw.rect(self.screen, Colours.WHITE.value, rect)
+                    sublist.append(rect)
+
+                self.squares.append(sublist)
+
+            self.grid = [[1 for i in range(self.grid_size)] for ii in range(self.grid_size)]
+
+        def setup_buttons_and_labels():
+            start_label = self.font.render("Set Start", 1, Colours.WHITE.value)
+            end_label = self.font.render("Set End", 1, Colours.WHITE.value)
+            obs_label = self.font.render("Set Obs.", 1, Colours.WHITE.value)
+            random_label = self.font.render("Randomize", 1, Colours.WHITE.value)
+            clear_label = self.font.render("Clear (1)", 1, Colours.WHITE.value)
+            clean_label = self.font.render("Clean", 1, Colours.WHITE.value)
+            reset_label = self.font.render("Reset", 1, Colours.WHITE.value)
+            switch_label = self.font.render("Switch", 1, Colours.WHITE.value)
+            findpath_label = self.font.render("Find Path", 1, Colours.WHITE.value)
+
+            labels = [start_label, end_label, obs_label, random_label, clear_label, clean_label, reset_label, switch_label, findpath_label]
+            # edit_modes:   0         1          2             3            4            5            6             7               8
+
+            button_margin = 3
+            text_width_margin = 4
+            text_height_margin = 2
+            next_pos = (2, 905)
+
+            for l in labels:
+                l_w, l_h = l.get_size()
+                bg_w, bg_h = l_w + 2 * text_width_margin, l_h + 2 * text_height_margin
+                bg_button = pygame.Rect(next_pos[0], next_pos[1], bg_w, bg_h)
+                pygame.draw.rect(self.screen, Colours.WHITE.value, bg_button, 1)
+                self.buttons.append(bg_button)
+
+                l_rect = l.get_rect(center=(next_pos[0] + bg_w // 2, next_pos[1] + bg_h // 2))
+                self.screen.blit(l, l_rect)
+
+                next_pos = (next_pos[0] + l_w + 2 * text_width_margin + button_margin, next_pos[1])
+
+            algorithm_text_label = self.font.render("Algorithm: ", 1, Colours.WHITE.value)
+            algorithm_text_label_size = algorithm_text_label.get_size()
+            self.screen.blit(algorithm_text_label, (next_pos[0] + 8, next_pos[1] + 1))
+
+            self.algo_label_start_pos = (next_pos[0] + 8 + algorithm_text_label_size[0], next_pos[1] + 1)
+            algorithm_info_label = self.font.render(self.algo_names[self.algo_selection], 1, Colours.WHITE.value)
+            self.screen.blit(algorithm_info_label, self.algo_label_start_pos)
+
+        setup_grid()
+        setup_buttons_and_labels()
+
+    def check_button_highlight(self, mouse):
+        for b in self.buttons:
             if b.collidepoint(mouse):
-                pygame.draw.rect(screen, GRAY, b.copy(), 1)
+                pygame.draw.rect(self.screen, Colours.GRAY.value, b.copy(), 1)
             else:
-                pygame.draw.rect(screen, WHITE, b.copy(), 1)
+                pygame.draw.rect(self.screen, Colours.WHITE.value, b.copy(), 1)
 
-        for e in pygame.event.get():
-            if e.type == pygame.QUIT:
-                done = 1
+    def check_paint_obstacle(self, mouse):
+        if self.edit_mode == 2:
+            for y, r in enumerate(self.squares):
+                for x, s in enumerate(r):
+                    if s.collidepoint(mouse):
+                        pygame.draw.rect(self.screen, Colours.BLACK.value, s)
+                        self.grid[y][x] = sys.maxsize
 
-            elif e.type == pygame.MOUSEBUTTONDOWN:
-                for i, b in enumerate(buttons):
-                    if b.collidepoint(mouse):
-                        if i == 3:
-                            # randomize (+ clean & reset)
-                            if edited_squares:
-                                for s in edited_squares:
-                                    pygame.draw.rect(screen, WHITE, s)
-                                edited_squares = []
-                            grid = reset_grid(screen, squares, grid_size)
-                            grid = random_obstacles(screen, grid, squares)
-                        elif i == 5:
-                            # clean
-                            if edited_squares:
-                                for s in edited_squares:
-                                    pygame.draw.rect(screen, WHITE, s)
-                                edited_squares = []
-                        elif i == 6:
-                            # reset
-                            grid = reset_grid(screen, squares, grid_size)
-                        elif i == 7:
-                            # switch
-                            if edited_squares:
-                                for s in edited_squares:
-                                    pygame.draw.rect(screen, WHITE, s)
-                                edited_squares = []
-                            if algo == len(ALGO_NAMES)-1:
-                                algo = 0
-                            else:
-                                algo += 1
-                            current_algo_name = algo_label_update(
-                                screen, last_pos, current_algo_name)
-                        elif i == 8:
-                            # algo
-                            if start_cell and end_cell:
-                                if algo == 0:
-                                    result = dijkstra(
-                                        screen, grid, start_xy, end_xy, squares)
-                                elif algo == 1:
-                                    result = a_star(
-                                        screen, grid, start_xy, end_xy, squares)
-                                if result:
-                                    display_result(result)
-                                else:
-                                    display_error("No possible path.")
-                            else:
-                                display_error("Start or end not set.")
+    def check_button_actions(self, mouse):
 
-                        edit_mode = i
+        def clean_grid():
+            for s in self.edited_squares:
+                pygame.draw.rect(self.screen, Colours.WHITE.value, s)
 
-                # choose cell to edit
-                for i, r in enumerate(squares):
-                    for j, s in enumerate(r):
-                        if s.collidepoint(mouse):
-                            if edit_mode not in [-1, 5, 6, 8]:
-                                grid = mark_cell(
-                                    screen, s, grid, (i, j), edit_mode)
+            self.edited_squares = []
 
-        pygame.display.update()
-        clock.tick(60)
+        def reset_grid():
+            for r in self.squares:
+                for s in r:
+                    pygame.draw.rect(self.screen, Colours.WHITE.value, s)
 
+            self.grid = [[1 for i in range(self.grid_size)] for ii in range(self.grid_size)]
+            self.start_cell = self.end_cell = None
+            self.start_xy = self.end_xy = None
 
-if __name__ == "__main__":
-    main()
+        def randomize_grid():
+            reset_grid()
+
+            for y, r in enumerate(self.squares):
+                for x, s in enumerate(r):
+                    if random.getrandbits(1):
+                        pygame.draw.rect(self.screen, Colours.BLACK.value, s)
+                        self.grid[y][x] = sys.maxsize
+
+        def switch_algo():
+            clean_grid()
+
+            if self.algo_selection == len(self.algo_names) - 1:
+                self.algo_selection = 0
+            else:
+                self.algo_selection += 1
+
+            self.screen.fill(Colours.PURE_BLACK.value, (self.algo_label_start_pos[0], self.algo_label_start_pos[1], 100, 30))
+            name = self.algo_names[self.algo_selection]
+            label = self.font.render(name, 1, Colours.WHITE.value)
+            self.screen.blit(label, self.algo_label_start_pos)
+
+        def run_algo():
+            msgbox = MessageBox()
+
+            if self.start_cell and self.end_cell:
+                if self.algo_selection == 0:
+                    dijkstra = Dijkstra(self.screen, self.start_xy, self.end_xy, self.squares, self.grid, self.edited_squares)
+                    result, self.edited_squares = dijkstra.find_path()
+                elif self.algo_selection == 1:
+                    a_star = AStar(self.screen, self.start_xy, self.end_xy, self.squares, self.grid, self.edited_squares)
+                    result, self.edited_squares = a_star.find_path()
+
+                if result:
+                    msgbox.show_info(f"Distance: {str(result)}")
+                else:
+                    msgbox.show_error("No possible path.")
+            else:
+                msgbox.show_error("Start or end not set.")
+
+            msgbox.update_and_destroy()
+
+        for i, b in enumerate(self.buttons):
+            if b.collidepoint(mouse):
+                if i == 3:
+                    randomize_grid()
+                elif i == 5:
+                    clean_grid()
+                elif i == 6:
+                    reset_grid()
+                elif i == 7:
+                    switch_algo()
+                elif i == 8:
+                    run_algo()
+                self.edit_mode = i
+
+    def check_cell_actions(self, mouse):
+
+        def set_start_cell():
+            if self.start_cell:
+                pygame.draw.rect(self.screen, Colours.WHITE.value, self.start_cell)
+
+            pygame.draw.rect(self.screen, self.mark_mode_colours[self.edit_mode], s)
+            self.start_cell = s
+            self.start_xy = (i, j)
+
+            if self.grid[i][j] == sys.maxsize:
+                self.grid[i][j] = 1
+
+        def set_end_cell():
+            if self.end_cell:
+                pygame.draw.rect(self.screen, Colours.WHITE.value, self.end_cell)
+
+            pygame.draw.rect(self.screen, self.mark_mode_colours[self.edit_mode], s)
+            self.end_cell = s
+            self.end_xy = (i, j)
+
+            if self.grid[i][j] == sys.maxsize:
+                self.grid[i][j] = 1
+
+        def clear_cell():
+            pygame.draw.rect(self.screen, Colours.WHITE.value, s)
+
+            if s == self.start_cell:
+                self.start_cell = self.start_xy = None
+            elif s == self.end_cell:
+                self.end_cell = self.end_xy = None
+            elif self.grid[i][j] == sys.maxsize:
+                self.grid[i][j] = 1
+
+        for i, r in enumerate(self.squares):
+            for j, s in enumerate(r):
+                if s.collidepoint(mouse) and self.edit_mode in [0, 1, 4]:
+                    if self.edit_mode == 0:
+                        set_start_cell()
+                    elif self.edit_mode == 1:
+                        set_end_cell()
+                    elif self.edit_mode == 4:
+                        clear_cell()
