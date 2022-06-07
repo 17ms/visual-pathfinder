@@ -138,6 +138,7 @@ class Visual:
             self.grid = [[1 for i in range(self.grid_size)] for ii in range(self.grid_size)]
             self.start_cell = self.end_cell = None
             self.start_xy = self.end_xy = None
+            self.edited_squares = []
 
         def randomize_grid():
             reset_grid()
@@ -162,6 +163,8 @@ class Visual:
             self.screen.blit(label, self.algo_label_start_pos)
 
         def run_algo():
+            clean_grid()
+
             msgbox = MessageBox()
 
             if self.start_cell and self.end_cell:
