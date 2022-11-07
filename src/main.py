@@ -15,8 +15,7 @@ def main():
     while not done:
         mouse = pygame.mouse.get_pos()
 
-        # paint_obstacle() checking not inside pygame.event-loop
-        # >> allow continuous painting
+        # having paint_obstacle check inside default event loop prevents "continuous painting"
         if pygame.mouse.get_pressed()[0]:
             visual.check_paint_obstacle(mouse)
 
